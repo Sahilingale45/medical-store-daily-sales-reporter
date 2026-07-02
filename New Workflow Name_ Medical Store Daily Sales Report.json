@@ -1,0 +1,459 @@
+{
+  "name": "New Workflow Name: Medical Store Daily Sales Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fdc25e35-4e18-47bf-ac9d-823687ca420e",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1ngpAMZuC8fkTinesjOZNVugp9Jjs1Z6wR3MpXU7s4jc",
+          "mode": "list",
+          "cachedResultName": "MEDICAL STORE DAILY SALES & INVENTORY REPORT",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ngpAMZuC8fkTinesjOZNVugp9Jjs1Z6wR3MpXU7s4jc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ngpAMZuC8fkTinesjOZNVugp9Jjs1Z6wR3MpXU7s4jc/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "380df8c4-7a69-4185-9c83-24945811d4ad",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "eQN3LqirGZrI4XQd",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items coming from the Google Sheet node\nconst items = $input.all();\n\n// Use today's date formatted as DD-MM-YYYY to match your sheet\nconst today = \"22-06-2026\"; \n\n// Filter the rows to ONLY include today's sales data\nconst todaysRows = items.filter(item => item.json[\"Date\"] === today);\n\n// Check if any data was found for today\nif (todaysRows.length === 0) {\n    return [{\n        json: {\n            dataFound: false,\n            message: `No sales data found for ${today}`,\n            date: today\n        }\n    }];\n}\n\n// Variables to hold calculations\nlet totalProducts = todaysRows.length;\nlet totalSales = 0;\nlet totalSoldQty = 0;\nlet totalPurchasedQty = 0;\nlet totalRemainingQty = 0;\nlet totalReturnQty = 0;\nlet totalExpiredQty = 0;\n\nlet productSalesMap = {};\nlet lowStockList = [];\nlet expiredList = [];\n\n// Loop through today's rows to crunch the numbers\nfor (const item of todaysRows) {\n    const row = item.json;\n    \n    // Parse values safely to numbers (matching your column names exactly)\n    const sales = Number(row[\"Total Sales (₹)\"] || 0);\n    const soldQty = Number(row[\"Sold Qty\"] || 0);\n    const purchasedQty = Number(row[\"Purchased Qty\"] || 0);\n    const remainingQty = Number(row[\"Remaining Qty\"] || 0);\n    const returnQty = Number(row[\"Return Qty\"] || 0);\n    const expiredQty = Number(row[\"Expired Qty\"] || 0);\n    const productName = row[\"Product Name\"] || \"Unknown Product\";\n\n    totalSales += sales;\n    totalSoldQty += soldQty;\n    totalPurchasedQty += purchasedQty;\n    totalRemainingQty += remainingQty;\n    totalReturnQty += returnQty;\n    totalExpiredQty += expiredQty;\n\n    // Track sales per product to find the top seller\n    productSalesMap[productName] = (productSalesMap[productName] || 0) + sales;\n\n    // Track low stock products (e.g., if remaining stock is less than 5)\n    if (remainingQty < 5) {\n        lowStockList.push(`${productName} (${remainingQty} left)`);\n    }\n\n    // Track expired items\n    if (expiredQty > 0) {\n        expiredList.push(`${productName} (${expiredQty} expired)`);\n    }\n}\n\n// Find top selling product\nlet topProduct = \"None\";\nlet maxSales = 0;\nfor (const prod in productSalesMap) {\n    if (productSalesMap[prod] > maxSales) {\n        maxSales = productSalesMap[prod];\n        topProduct = `${prod} (₹${maxSales})`;\n    }\n}\n\n// Format arrays into readable strings for the email\nconst lowStockProducts = lowStockList.length > 0 ? lowStockList.join(\", \") : \"None\";\nconst expiredProducts = expiredList.length > 0 ? expiredList.join(\", \") : \"None\";\n\n// Return the final formatted object to pass to the True branch\nreturn [{\n    json: {\n        dataFound: true,\n        date: today,\n        totalProducts: totalProducts,\n        totalSales: totalSales,\n        totalSoldQty: totalSoldQty,\n        totalPurchasedQty: totalPurchasedQty,\n        totalRemainingQty: totalRemainingQty,\n        totalReturnQty: totalReturnQty,\n        totalExpiredQty: totalExpiredQty,\n        topProduct: topProduct,\n        lowStockProducts: lowStockProducts,\n        expiredProducts: expiredProducts\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "4cfe9e40-6472-47d6-a321-ad15d212573a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cdaa8408-b6e5-423d-bf5b-bf05c51b07a1",
+              "leftValue": "={{ $json.dataFound }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        624,
+        0
+      ],
+      "id": "cdce653f-b47a-4a1e-b709-23aaef8ff0d1",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eb7f8a7d-c24f-46a5-9678-4ab773637e23",
+              "name": "subject",
+              "value": "=Daily Medical Store Sales Report - {{ $json.date }}",
+              "type": "string"
+            },
+            {
+              "id": "548a5bf5-912d-49bc-ab07-2e0f60e87b16",
+              "name": "emailbody",
+              "value": "=Daily Medical Store Sales Report\n\nDate: {{ $json.date }}\n\nTotal Products: {{ $json.totalProducts }}\nTotal Sales Amount: ₹{{ $json.totalSales }}\nTotal Sold Quantity: {{ $json.totalSoldQty }}\nTotal Purchased Quantity: {{ $json.totalPurchasedQty }}\nTotal Remaining Stock: {{ $json.totalRemainingQty }}\nTotal Returned Quantity: {{ $json.totalReturnQty }}\nTotal Expired Quantity: {{ $json.totalExpiredQty }}\n\nTop Selling Product:\n{{ $json.topProduct }}\n\nLow Stock Products:\n{{ $json.lowStockProducts }}\n\nExpired Products:\n{{ $json.expiredProducts }}\n\nRegards,\nMedical Store Automation",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "dotNotation": false
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        816,
+        -96
+      ],
+      "id": "cb4b9b8e-9783-4e67-9be0-6652b8f95d33",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "sendTo": "sahilingale4444@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.emailbody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        -96
+      ],
+      "id": "16b8f79a-27d5-4448-8169-fcf644bfea1b",
+      "name": "Send a message",
+      "webhookId": "fceceafa-77c9-45d1-b627-49125c30d643",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "HukR2oQNihgRIogH",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1ngpAMZuC8fkTinesjOZNVugp9Jjs1Z6wR3MpXU7s4jc",
+          "mode": "list",
+          "cachedResultName": "MEDICAL STORE DAILY SALES & INVENTORY REPORT",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ngpAMZuC8fkTinesjOZNVugp9Jjs1Z6wR3MpXU7s4jc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ngpAMZuC8fkTinesjOZNVugp9Jjs1Z6wR3MpXU7s4jc/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "REPORT STATUS": "=Sent"
+          },
+          "matchingColumns": [
+            "REPORT STATUS"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product Name",
+              "displayName": "Product Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Batch No",
+              "displayName": "Batch No",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Expiry Date",
+              "displayName": "Expiry Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Opening Qty",
+              "displayName": "Opening Qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Purchased Qty",
+              "displayName": "Purchased Qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total Available Qty",
+              "displayName": "Total Available Qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sold Qty",
+              "displayName": "Sold Qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Remaining Qty",
+              "displayName": "Remaining Qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Purchase Price (₹)",
+              "displayName": "Purchase Price (₹)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Selling Price (₹)",
+              "displayName": "Selling Price (₹)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total Sales (₹)",
+              "displayName": "Total Sales (₹)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Expired Qty",
+              "displayName": "Expired Qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Return Qty",
+              "displayName": "Return Qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Remarks",
+              "displayName": "Remarks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "REPORT STATUS",
+              "displayName": "REPORT STATUS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1232,
+        -96
+      ],
+      "id": "d1e10961-6e57-4d58-9323-8808a93a1420",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "eQN3LqirGZrI4XQd",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5b7f172a-531c-44a0-b3f6-71e5c7b80012",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f789553496ce47a79749c154375fd4df928f867a5fca756efdd5d6a053f14866"
+  },
+  "nodeGroups": [],
+  "id": "VTHQcdn0WSlDrxS6",
+  "tags": []
+}
